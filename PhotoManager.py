@@ -5,7 +5,7 @@ from datetime import datetime
 import calendar
 
 from Config import Config
-from FileMapper import getCreationTimestamp
+from TimestampExtractor import TimestampExtractor
 
 import shutil
 
@@ -48,84 +48,32 @@ class PhotoManager():
 
         supported_filetypes = Config.supported_img_filetypes + Config.supported_video_filetypes + Config.supported_audio_filetypes
 
-        if ext not in supported_filetypes:
+        if ext.lower() not in supported_filetypes:
             print(f'Skipping {filepath}: unknown filetype')
+            makedirs(path.join(self.outdir, 'miscellaneous'))
+            
+            return
+
+        timestamp = TimestampExtractor.getTimestamp(filepath).utctimetuple()
+
+        base_path = path.join(
+            self.outdir,
+            str(timestamp.tm_year),
+            calendar.month_name[timestamp.tm_mon],
+            str(timestamp.tm_mday).zfill(2)
+        )
 
         try:
+            makedirs(base_path)
+        except FileExistsError:
+            pass
 
-            year, month, day, hour, minute, second = None, None, None, None, None, None
-            # get the exif data
-            with open(filepath, 'rb') as fil:
-                tags = {}
-                try:
-                    tags = exifread.process_file(fil)
-                except:
-                    pass
+        final_path = path.join(base_path, path.basename(filepath))
 
-                # for tag in tags:
-                #     if tag not in ['JPEGThumbnail', 'TIFFThumbnail']:
-                #         print(f'k: {tag}; v: {tags[tag]}')
-                
-                if 'EXIF DateTimeOriginal' in tags:
-                    try:
-                        dt = tags['EXIF DateTimeOriginal']
-                        parts = str(dt).replace(' ', ':').split(':')
-                        year, month, day, hour, minute, second = parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]
-                    except KeyboardInterrupt:
-                        raise KeyboardInterrupt
-                    except:
-                        pass
-                elif 'EXIF DateTimeDigitized' in tags:
-                    try:
-                        dt = tags['EXIF DateTimeDigitized']
-                        parts = str(dt).replace(' ', ':').split(':')
-                        year, month, day, hour, minute, second = parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]
-                    except KeyboardInterrupt:
-                        raise KeyboardInterrupt
-                    except:
-                        pass
-                else:
-                    try:
-                        tstmp = getCreationTimestamp(filepath)
-                        dt = datetime.fromtimestamp(tstmp)
-                        year, month, day, hour, minute, second = (
-                            dt.year,
-                            dt.month,
-                            dt.day,
-                            dt.hour,
-                            dt.minute,
-                            dt.second
-                        )
-                    except KeyboardInterrupt:
-                        raise KeyboardInterrupt
-                    except:
-                        pass
-            
-            if year is not None:
-                new_home = path.join(
-                    self.outdir,
-                    str(year),
-                    calendar.month_name[int(month)],
-                    str(day).zfill(2)
-                )
+        if self.verbose:
+            print(f'{filepath} -> {final_path}')
 
-                try:
-                    makedirs(new_home)
-                except FileExistsError:
-                    pass
-
-                final_path = path.join(new_home, path.basename(filepath))
-
-                if self.verbose:
-                    print(f'{filepath} -> {final_path}')
-                shutil.copy2(
-                    filepath,
-                    new_home
-                )
-
-        except KeyboardInterrupt:
-            raise KeyboardInterrupt
-        except:
-            raise
-            # print(f'Failed processing {filepath} due to error')
-            # print(sys.exc_info()[0])
+        shutil.copy2(
+            filepath,
+            final_path
+        )

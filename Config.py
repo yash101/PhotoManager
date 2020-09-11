@@ -12,3 +12,6 @@ class Config():
     supported_audio_filetypes = [
         'wav', 'mp3'
     ]
+
+    ffmpeg_cmd = 'ffmpeg'
+    ffprobe_cmd = 'ffprobe'
