@@ -1,5 +1,5 @@
 import datetime
-import dateutil
+import dateutil.parser
 import time
 import os.path
 import exifread

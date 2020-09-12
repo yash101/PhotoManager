@@ -8,6 +8,7 @@ from Config import Config
 from TimestampExtractor import TimestampExtractor
 
 import shutil
+import sqlite3
 
 class PhotoManager():
     def __init__(
@@ -21,16 +22,34 @@ class PhotoManager():
         self.recursive = recursive
         self.indir = indir
         self.outdir = outdir
+
+        self.init_database()
     
     def get_inpath(self, p):
         return path.join(self.indir, p)
 
     def get_outpath(self, p):
         return path.join(self.outdir, p)
+    
+    def init_database(self):
+        self.db = sqlite3.connect(self.get_outpath('photomgr.db'))
+        self.db_cursor = self.db.cursor()
+
+        self.db_cursor.execute("""
+            CREATE TABLE IF NOT EXISTS Photo (
+                filepath            TEXT                NOT NULL    UNIQUE,
+                timestamp           INTEGER             NOT NULL,
+                coordsX             REAL                                    DEFAULT NULL,
+                coordsY             REAL                                    DEFAULT NULL,
+                fileSize            INTEGER             NOT NULL,
+                cryptoHash          TEXT                                    DEFAULT NULL,
+                imageHash           TEXT                                    DEFAULT NULL
+            );
+        """)
 
     def import_photos(self):
         if self.recursive:
-            for root, dirs, fils in walk(self.indir, topdown = True, followlinks = False):
+            for root, _, fils in walk(self.indir, topdown = True, followlinks = False):
                 for fil in fils:
                     self.import_photo(path.join(root, fil))
         else:
