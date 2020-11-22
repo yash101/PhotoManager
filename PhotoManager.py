@@ -3,6 +3,7 @@ from os import path, listdir, walk, makedirs
 import sys
 from datetime import datetime
 import calendar
+import hashlib
 
 from Config import Config
 from TimestampExtractor import TimestampExtractor
@@ -32,11 +33,13 @@ class PhotoManager():
         return path.join(self.outdir, p)
     
     def init_database(self):
+        with open(self.get_outpath('photomgr.db'), 'a'):
+            pass
         self.db = sqlite3.connect(self.get_outpath('photomgr.db'))
         self.db_cursor = self.db.cursor()
 
         self.db_cursor.execute("""
-            CREATE TABLE IF NOT EXISTS Photo (
+            CREATE TABLE IF NOT EXISTS photo (
                 filepath            TEXT                NOT NULL    UNIQUE,
                 timestamp           INTEGER             NOT NULL,
                 coordsX             REAL                                    DEFAULT NULL,
@@ -73,13 +76,13 @@ class PhotoManager():
             
             return
 
-        timestamp = TimestampExtractor.getTimestamp(filepath).utctimetuple()
+        dt = TimestampExtractor.getTimestamp(filepath)
+        timestamp = dt.utctimetuple()
 
+        rel_path = path.join(str(timestamp.tm_year), calendar.month_name[timestamp.tm_mon], str(timestamp.tm_mday).zfill(2))
         base_path = path.join(
             self.outdir,
-            str(timestamp.tm_year),
-            calendar.month_name[timestamp.tm_mon],
-            str(timestamp.tm_mday).zfill(2)
+            rel_path
         )
 
         try:
@@ -96,3 +99,20 @@ class PhotoManager():
             filepath,
             final_path
         )
+
+        size = None
+        sha256 = hashlib.sha256()
+        try:
+            with open(filepath, 'rb') as f:
+                for blk in iter(lambda: f.read(4096), b''):
+                    sha256.update(blk)
+        
+            size = path.getsize(filepath)
+
+            if self.db is not None:
+                self.db.execute(
+                    'INSERT INTO photo VALUES (filepath, timestamp, fileSize, cryptoHash, imageHash)',
+                    (rel_path, dt.timestamp(), size, sha256.hexdigest(), '')
+                )
+        except:
+            print(sys.exc_info())
